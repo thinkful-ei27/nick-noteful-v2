@@ -87,13 +87,20 @@ router.put('/:id', (req, res, next) => {
   knex
     .from('notes')
     .where('id', id)
-    .update(updateObj, ['title', 'content', 'id'])
-    .then(result => {
-      res.json(result);
+    .update(updateObj, 'id')
+    .then(([id]) => {
+      return knex.select('notes.id', 'title', 'content', 'folder_id as folderId', 'folders.name as folderName')
+        .from('notes')
+        .leftJoin('folders', 'notes.folder_id', 'folders.id')
+        .where('notes.id', id)
+    })
+    .then(([result]) => {
+      res.location(`${req.originalUrl}/${result.id}`).status(201).json(result);
     })
     .catch(err => {
       next(err);
     });
+  });
 
 
     
@@ -123,22 +130,37 @@ router.put('/:id', (req, res, next) => {
   //   .catch(err => {
   //     next(err);
   //   });
-});
+
 
 // Post (insert) an item
 router.post('/', (req, res, next) => {
-  const { title, content } = req.body;
-  const newItem = { title, content };
+  const { title, content, folderId } = req.body;
+  const newItem = { 
+    title: title,
+    content:content,
+    folder_id: folderId 
+  };
   
-  knex
-    .from('notes')
-    .insert(newItem, ['title', 'content', 'id'])
-    .then(result => {
-      res.json(result[0]);
+  // if (!newItem.title) { const err = new Error('Missing title in request body'); err.status = 400; return next(err); }
+
+  let noteId;
+  
+  knex.insert(newItem)
+    .into('notes')
+    .returning('id')
+    .then(([id]) => {
+      noteId = id;
+      return knex.select('notes.id', 'title', 'content', 'folder_id as folderId', 'folders.name as folderName')
+        .from('notes')
+        .leftJoin('folders', 'notes.folder_id', 'folders.id')
+        .where('notes.id', noteId);
     })
-    .catch(err => {
-      next(err);
-    })
+      .then(([result]) => {
+        res.location(`${req.originalUrl}/${result.id}`).status(201).json(result);
+      })
+      .catch(err => next(err));
+    });
+
 
   /***** Never trust users - validate input *****/
   // if (!newItem.title) {
@@ -156,7 +178,6 @@ router.post('/', (req, res, next) => {
   //   .catch(err => {
   //     next(err);
   //   });
-});
 
 // Delete an item
 router.delete('/:id', (req, res, next) => {
