@@ -31,6 +31,8 @@ app.use('/api/notes', notesRouter);
 //Mount router on "/api"
 app.use('/api/folders', foldersRouter);
 
+app.use('/api/tags', tagsRouter);
+
 // Custom 404 Not Found route handler
 app.use((req, res, next) => {
   const err = new Error('Not Found');
